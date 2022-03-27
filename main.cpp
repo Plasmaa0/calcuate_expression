@@ -4,14 +4,56 @@
 
 using namespace std;
 
+const int INVALID_NUMBER = -1;
+
+typedef enum NodeType
+{
+    NUMBER,
+    VARIABLE,
+    OPERATOR,
+    INVALID
+} NodeType;
+
 typedef struct TreeNode
 {
-    bool isOp;
+    NodeType type;
     char op;
+    char var;
     int number;
     TreeNode *left;
     TreeNode *right;
 } TreeNode;
+
+typedef struct VariablesDictionary
+{
+    int values['z' - 'a'];
+} VariablesDictionary;
+
+VariablesDictionary *createDict()
+{
+    VariablesDictionary *dict = new VariablesDictionary;
+    for (int i = 0; i < 'z' - 'a'; i++)
+    {
+        dict->values[i] = INVALID_NUMBER;
+    }
+    return dict;
+}
+
+void setVariable(char name, int value, VariablesDictionary *dict)
+{
+    dict->values[name - 'a'] = value;
+}
+
+int getVariable(char name, VariablesDictionary *dict, bool &success)
+{
+    int val = dict->values[name - 'a'];
+    if (val == INVALID_NUMBER)
+    {
+        cout << "VARIABLE " << name << " NOT EXIST" << endl;
+        success = false;
+    }
+    return val;
+}
 
 int priority(char ch)
 {
@@ -38,7 +80,8 @@ TreeNode *create_node()
     root->right = NULL;
     root->number = -42;
     root->op = '#';
-    root->isOp = false;
+    root->var = '#';
+    root->type = INVALID;
     return root;
 }
 
@@ -75,8 +118,21 @@ TreeNode *createTree(char *str, int a, int b)
     TreeNode *root = create_node();
     if (b - a == 1)
     {
-        root->number = str[a] - '0';
-        root->isOp = false;
+        if ('0' <= str[a] && str[a] <= '9') //number
+        {
+            root->number = str[a] - '0';
+            root->type = NUMBER;
+        }
+        else if ('a' <= str[a] && str[a] <= 'z')
+        {
+            root->var = str[a];
+            root->type = VARIABLE;
+        }
+        else
+        {
+            root->type = INVALID;
+        }
+
         return root;
     }
 
@@ -112,7 +168,7 @@ TreeNode *createTree(char *str, int a, int b)
         return NULL;
     }
 
-    root->isOp = true;
+    root->type = OPERATOR;
     root->op = str[division_index];
 
     // printf("\nchar = %c\nindex = %d\npriority = %d\n\n", str[division_index], division_index, min_priority);
@@ -143,11 +199,15 @@ void print(const TreeNode *root, int depth)
         depth++;
         print(root->right, depth);
         tabulate(depth);
-        if (root->isOp)
+        if (root->type == OPERATOR)
         {
             printf("%c\n", root->op);
         }
-        else
+        if (root->type == VARIABLE)
+        {
+            printf("%c\n", root->var);
+        }
+        else if (root->type == NUMBER)
         {
             printf("%d\n", root->number);
         }
@@ -182,7 +242,7 @@ double solve(char op, double a, double b, bool &success)
     return 10e10;
 }
 
-double evaluate(TreeNode *root, bool &success)
+double evaluate(TreeNode *root, VariablesDictionary *dict, bool &success)
 {
     if (root == NULL)
     {
@@ -190,12 +250,97 @@ double evaluate(TreeNode *root, bool &success)
         return 10e10;
     }
 
-    if (!root->isOp) //number
+    if (root->type == NUMBER) //number
     {
         return root->number;
     }
+    if (root->type == VARIABLE) //number
+    {
+        return getVariable(root->var, dict, success);
+    }
 
-    return solve(root->op, evaluate(root->left, success), evaluate(root->right, success), success);
+    return solve(root->op, evaluate(root->left, dict, success), evaluate(root->right, dict, success), success);
+}
+
+void pre_order(const TreeNode *root)
+{
+    if (root == NULL)
+    {
+        return;
+    }
+    if (root->type == OPERATOR)
+    {
+        printf("%c ", root->op);
+    }
+    if (root->type == VARIABLE)
+    {
+        printf("%c ", root->var);
+    }
+    else if (root->type == NUMBER)
+    {
+        printf("%d ", root->number);
+    }
+    pre_order(root->left);
+    pre_order(root->right);
+}
+
+void in_order(const TreeNode *root)
+{
+    if (root == NULL)
+    {
+        return;
+    }
+    in_order(root->left);
+    if (root->type == OPERATOR)
+    {
+        printf("%c ", root->op);
+    }
+    if (root->type == VARIABLE)
+    {
+        printf("%c ", root->var);
+    }
+    else if (root->type == NUMBER)
+    {
+        printf("%d ", root->number);
+    }
+    in_order(root->right);
+}
+
+void post_order(const TreeNode *root)
+{
+    if (root == NULL)
+    {
+        return;
+    }
+    post_order(root->left);
+    post_order(root->right);
+    if (root->type == OPERATOR)
+    {
+        printf("%c ", root->op);
+    }
+    if (root->type == VARIABLE)
+    {
+        printf("%c ", root->var);
+    }
+    else if (root->type == NUMBER)
+    {
+        printf("%d ", root->number);
+    }
+}
+
+void info(TreeNode *root)
+{
+    cout << "TREE:" << endl;
+    print(root, 0);
+    cout << "post order: ";
+    post_order(root);
+    cout << endl;
+    cout << "in order: ";
+    in_order(root);
+    cout << endl;
+    cout << "pre order: ";
+    pre_order(root);
+    cout << endl;
 }
 
 int main()
@@ -208,16 +353,19 @@ int main()
                 9        -              4       /
                       6     1                3     +
                                                   3   7
-
     */
 
-    cout << "str: ";
-    cin >> str;
+    // cout << "str: ";
+    // cin >> str;
     TreeNode *root = createTree(str);
-    print(root, 0);
+
+    VariablesDictionary *dict = createDict();
+    setVariable('a', 10, dict);
+
+    info(root);
 
     bool success = true;
-    double res = evaluate(root, success);
+    double res = evaluate(root, dict, success);
     if (success)
         cout << "res = " << setprecision(15) << res << endl;
     else
